@@ -1,52 +1,64 @@
-# 🛣️ Interactive Road Damage Detection Streamlit App
-
-# =========================================
-# app.py
-# INTERACTIVE ROAD DAMAGE DETECTION SYSTEM
-# =========================================
-
 import streamlit as st
 import tensorflow as tf
 import numpy as np
 from PIL import Image, ImageEnhance
 import json
-import cv2
+import os
+import gdown
 
-# -----------------------------------------
-# PAGE CONFIGURATION
-# -----------------------------------------
+# =========================================
+# PAGE CONFIG
+# =========================================
+
 st.set_page_config(
-    page_title="Road Damage Detection",
+    page_title="RoadGuard AI",
     page_icon="🛣️",
     layout="wide"
 )
 
-# -----------------------------------------
-# LOAD MODEL
-# -----------------------------------------
-@st.cache_resource
+# =========================================
+# DOWNLOAD MODEL FROM GOOGLE DRIVE
+# =========================================
 
+MODEL_PATH = "road_damage_model.keras"
+
+if not os.path.exists(MODEL_PATH):
+
+    file_id = "1bVyGak95iSWEpOxJxBL7hksgozoGaSSx"
+
+    url = f"https://drive.google.com/uc?id={file_id}"
+
+    with st.spinner("Downloading CNN Model..."):
+        gdown.download(url, MODEL_PATH, quiet=False)
+
+# =========================================
+# LOAD MODEL
+# =========================================
+
+@st.cache_resource
 def load_model():
-    model = tf.keras.models.load_model("road_damage_model.h5")
+    model = tf.keras.models.load_model(MODEL_PATH)
     return model
 
 model = load_model()
 
-# -----------------------------------------
+# =========================================
 # LOAD LABEL MAP
-# -----------------------------------------
+# =========================================
+
 with open("label_map.json", "r") as f:
     label_map = json.load(f)
 
-index_to_label = {v:k for k,v in label_map.items()}
+index_to_label = {v: k for k, v in label_map.items()}
 
-# -----------------------------------------
-# SIDEBAR
-# -----------------------------------------
+# =========================================
+# SIDEBAR SETTINGS
+# =========================================
+
 st.sidebar.title("⚙️ Prediction Settings")
 
 img_size = st.sidebar.selectbox(
-    "Select Image Size",
+    "Image Size",
     [128, 224, 256],
     index=1
 )
@@ -68,7 +80,7 @@ contrast = st.sidebar.slider(
 )
 
 rotation = st.sidebar.slider(
-    "Rotation Angle",
+    "Rotation",
     -45,
     45,
     0
@@ -80,43 +92,43 @@ flip_option = st.sidebar.selectbox(
 )
 
 show_probabilities = st.sidebar.checkbox(
-    "Show All Class Probabilities",
+    "Show Class Probabilities",
     value=True
 )
 
-# -----------------------------------------
+# =========================================
 # TITLE
-# -----------------------------------------
-st.title("🛣️ AI Road Damage Detection System")
+# =========================================
+
+st.title("🛣️ RoadGuard AI")
+st.subheader("CNN-Based Road Damage Detection System")
 
 st.markdown("""
-This application predicts road damage categories using a CNN model.
+Upload a road image to detect:
 
-### Features
-- Upload road images
-- Adjust brightness
-- Adjust contrast
-- Rotate images
-- Flip images
-- Get prediction confidence
-- Interactive CNN prediction
+- Crack
+- Pothole
+- Patch
+- Normal Road
+
+using Deep Learning and CNN.
 """)
 
-# -----------------------------------------
+# =========================================
 # FILE UPLOAD
-# -----------------------------------------
+# =========================================
+
 uploaded_file = st.file_uploader(
     "📤 Upload Road Image",
     type=["jpg", "jpeg", "png"]
 )
 
-# -----------------------------------------
-# IMAGE PROCESSING FUNCTION
-# -----------------------------------------
+# =========================================
+# IMAGE PREPROCESSING
+# =========================================
 
 def preprocess_image(image):
 
-    # Resize
     image = image.resize((img_size, img_size))
 
     # Brightness
@@ -137,43 +149,37 @@ def preprocess_image(image):
     elif flip_option == "Vertical":
         image = image.transpose(Image.FLIP_TOP_BOTTOM)
 
-    # Convert to array
     img_array = np.array(image)
 
-    # Normalize
     img_array = img_array / 255.0
 
-    # Expand dimensions
     img_array = np.expand_dims(img_array, axis=0)
 
     return image, img_array
 
-# -----------------------------------------
-# PREDICTION SECTION
-# -----------------------------------------
+# =========================================
+# MAIN PREDICTION
+# =========================================
+
 if uploaded_file is not None:
 
     image = Image.open(uploaded_file).convert("RGB")
 
     col1, col2 = st.columns(2)
 
-    # ORIGINAL IMAGE
     with col1:
         st.subheader("📷 Original Image")
         st.image(image, use_container_width=True)
 
-    # PROCESS IMAGE
     processed_display_image, processed_image = preprocess_image(image)
 
-    # PROCESSED IMAGE
     with col2:
         st.subheader("⚡ Processed Image")
         st.image(processed_display_image, use_container_width=True)
 
-    # PREDICT BUTTON
     if st.button("🔍 Predict Road Condition"):
 
-        with st.spinner("Model Predicting..."):
+        with st.spinner("Analyzing Road Image..."):
 
             prediction = model.predict(processed_image)
 
@@ -183,31 +189,38 @@ if uploaded_file is not None:
 
             predicted_label = index_to_label[predicted_class]
 
-        # -----------------------------------------
+        # =========================================
         # RESULTS
-        # -----------------------------------------
+        # =========================================
+
         st.success(f"✅ Predicted Class: {predicted_label}")
 
         st.info(f"🎯 Confidence Score: {confidence*100:.2f}%")
 
-        # -----------------------------------------
-        # DAMAGE ALERTS
-        # -----------------------------------------
+        # =========================================
+        # ALERTS
+        # =========================================
+
         if predicted_label.lower() == "pothole":
+
             st.error("⚠️ Severe Road Damage Detected")
 
         elif predicted_label.lower() == "crack":
+
             st.warning("⚠️ Crack Detected on Road Surface")
 
         elif predicted_label.lower() == "patch":
+
             st.warning("⚠️ Road Patch Detected")
 
         else:
+
             st.success("✅ Road Appears Normal")
 
-        # -----------------------------------------
-        # PROBABILITY CHART
-        # -----------------------------------------
+        # =========================================
+        # PROBABILITIES
+        # =========================================
+
         if show_probabilities:
 
             st.subheader("📊 Prediction Probabilities")
@@ -215,17 +228,19 @@ if uploaded_file is not None:
             probabilities = {}
 
             for i, prob in enumerate(prediction[0]):
+
                 probabilities[index_to_label[i]] = float(prob)
 
             st.bar_chart(probabilities)
 
-            # SHOW VALUES
             for label, prob in probabilities.items():
-                st.write(f"{label} : {prob*100:.2f}%")
 
-# -----------------------------------------
+                st.write(f"{label}: {prob*100:.2f}%")
+
+# =========================================
 # FOOTER
-# -----------------------------------------
+# =========================================
+
 st.markdown("---")
 
-st.write("🚀 Built Using TensorFlow + Streamlit")
+st.write("🚀 Built using TensorFlow + Streamlit")
