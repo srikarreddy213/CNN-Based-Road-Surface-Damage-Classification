@@ -5,16 +5,47 @@ from PIL import Image, ImageEnhance
 import json
 import os
 import gdown
+import pandas as pd
 
 # =========================================
 # PAGE CONFIG
 # =========================================
 
 st.set_page_config(
-    page_title="RoadGuard AI",
+    page_title="AI Road Damage Detection",
     page_icon="🛣️",
     layout="wide"
 )
+
+# =========================================
+# CUSTOM CSS
+# =========================================
+
+st.markdown("""
+<style>
+
+.main {
+    background-color: #0E1117;
+}
+
+h1, h2, h3 {
+    color: white;
+}
+
+.stButton>button {
+    background-color: #FF4B4B;
+    color: white;
+    border-radius: 10px;
+    border: none;
+    padding: 10px 20px;
+}
+
+.stButton>button:hover {
+    background-color: #ff1f1f;
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 # =========================================
 # DOWNLOAD MODEL
@@ -43,13 +74,6 @@ def load_model():
 model = load_model()
 
 # =========================================
-# SHOW MODEL INPUT SHAPE
-# =========================================
-
-st.sidebar.write("Model Input Shape:")
-st.sidebar.write(model.input_shape)
-
-# =========================================
 # LOAD LABEL MAP
 # =========================================
 
@@ -59,13 +83,13 @@ with open("label_map.json", "r") as f:
 index_to_label = {v: k for k, v in label_map.items()}
 
 # =========================================
-# FIXED MODEL IMAGE SIZE
+# SETTINGS
 # =========================================
 
 IMG_SIZE = 128
 
 # =========================================
-# SIDEBAR SETTINGS
+# SIDEBAR
 # =========================================
 
 st.sidebar.title("⚙️ Prediction Settings")
@@ -98,107 +122,125 @@ flip_option = st.sidebar.selectbox(
     ["None", "Horizontal", "Vertical"]
 )
 
-show_probabilities = st.sidebar.checkbox(
-    "Show Probabilities",
-    value=True
+# =========================================
+# SECTION 1 — HEADER
+# =========================================
+
+st.title("🛣️ AI-Based Road Damage Detection System")
+
+st.subheader(
+    "Smart City Infrastructure Monitoring using CNN"
 )
 
+st.markdown("---")
+
 # =========================================
-# TITLE
+# SECTION 2 — ABOUT PROJECT
 # =========================================
 
-st.title("🛣️ RoadGuard AI")
-st.subheader("CNN-Based Road Damage Detection System")
+st.header("📘 About the Project")
 
-st.markdown("""
-Upload a road image to detect:
+st.write("""
+Road monitoring is extremely important for maintaining safe transportation infrastructure.
+Damaged roads can cause accidents, traffic congestion, vehicle damage, and safety risks.
 
-- Crack
-- Pothole
-- Patch
-- Normal Road
+This project uses Convolutional Neural Networks (CNNs), a deep learning technique used in computer vision,
+to automatically detect road surface damage from images.
+
+CNN models can identify patterns such as:
+- potholes
+- cracks
+- patches
+- manholes
+
+### Industry Applications
+- Smart City Monitoring
+- Automated Road Inspection
+- Government Infrastructure Management
+- Traffic Safety Systems
+- Autonomous Vehicle Vision Systems
 """)
 
+st.markdown("---")
+
 # =========================================
-# FILE UPLOADER
+# SECTION 3 — UPLOAD AREA
 # =========================================
 
+st.header("📤 Upload Road Image")
+
 uploaded_file = st.file_uploader(
-    "📤 Upload Road Image",
+    "Upload Road Surface Image",
     type=["jpg", "jpeg", "png"]
 )
 
 # =========================================
-# PREPROCESS IMAGE
+# PREPROCESS FUNCTION
 # =========================================
 
 def preprocess_image(image):
 
-    # MODEL EXPECTS 128x128 RGB
     image = image.resize((128, 128))
 
-    # RGB FORMAT
     image = image.convert("RGB")
 
-    # BRIGHTNESS
     enhancer = ImageEnhance.Brightness(image)
     image = enhancer.enhance(brightness)
 
-    # CONTRAST
     enhancer = ImageEnhance.Contrast(image)
     image = enhancer.enhance(contrast)
 
-    # ROTATION
     image = image.rotate(rotation)
 
-    # FLIP
     if flip_option == "Horizontal":
         image = image.transpose(Image.FLIP_LEFT_RIGHT)
 
     elif flip_option == "Vertical":
         image = image.transpose(Image.FLIP_TOP_BOTTOM)
 
-    # CONVERT TO ARRAY
     img_array = np.array(image)
 
-    # NORMALIZE
     img_array = img_array.astype("float32") / 255.0
 
-    # ADD BATCH DIMENSION
     img_array = np.expand_dims(img_array, axis=0)
 
     return image, img_array
 
 # =========================================
-# PREDICTION
+# MAIN SECTION
 # =========================================
 
 if uploaded_file is not None:
 
     image = Image.open(uploaded_file)
 
-    col1, col2 = st.columns(2)
-
-    # ORIGINAL IMAGE
-    with col1:
-        st.subheader("📷 Original Image")
-        st.image(np.array(image), width=350)
-
-    # PROCESS IMAGE
     processed_display_image, processed_image = preprocess_image(image)
 
-    # PROCESSED IMAGE
+    # =========================================
+    # SECTION 4 — IMAGE PREVIEW
+    # =========================================
+
+    st.header("🖼️ Uploaded Image Preview")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Original Image")
+        st.image(np.array(image), width=350)
+
     with col2:
-        st.subheader("⚡ Processed Image")
+        st.subheader("Processed Image")
         st.image(np.array(processed_display_image), width=350)
 
-    # SHOW INPUT SHAPE
-    st.write("Prediction Input Shape:", processed_image.shape)
+    st.markdown("---")
 
+    # =========================================
     # PREDICT BUTTON
-    if st.button("🔍 Predict Road Condition"):
+    # =========================================
 
-        with st.spinner("Analyzing Road Image..."):
+    if st.button("🔍 Predict Road Damage"):
+
+        with st.spinner("Analyzing Road Condition..."):
 
             prediction = model.predict(processed_image)
 
@@ -209,52 +251,105 @@ if uploaded_file is not None:
             predicted_label = index_to_label[predicted_class]
 
         # =========================================
-        # RESULTS
+        # SEVERITY
         # =========================================
 
-        st.success(f"✅ Predicted Class: {predicted_label}")
-
-        st.info(f"🎯 Confidence Score: {confidence*100:.2f}%")
-
-        # =========================================
-        # ALERTS
-        # =========================================
+        severity = "Low"
 
         if predicted_label.lower() == "pothole":
-
-            st.error("⚠️ Severe Road Damage Detected")
+            severity = "High"
 
         elif predicted_label.lower() == "crack":
-
-            st.warning("⚠️ Crack Detected")
+            severity = "Medium"
 
         elif predicted_label.lower() == "patch":
+            severity = "Medium"
 
-            st.warning("⚠️ Patch Detected")
+        else:
+            severity = "Low"
+
+        # =========================================
+        # SECTION 5 — PREDICTION AREA
+        # =========================================
+
+        st.header("📌 Prediction Results")
+
+        st.success(
+            f"Prediction: {predicted_label}"
+        )
+
+        st.info(
+            f"Confidence: {confidence*100:.2f}%"
+        )
+
+        st.warning(
+            f"Severity Level: {severity}"
+        )
+
+        st.markdown("---")
+
+        # =========================================
+        # SECTION 6 — VISUALIZATION
+        # =========================================
+
+        st.header("📊 Visualization Area")
+
+        probabilities = {}
+
+        for i, prob in enumerate(prediction[0]):
+
+            probabilities[index_to_label[i]] = float(prob)
+
+        chart_data = pd.DataFrame(
+            probabilities.items(),
+            columns=["Class", "Probability"]
+        )
+
+        st.bar_chart(
+            chart_data.set_index("Class")
+        )
+
+        st.write("### Class Confidence Scores")
+
+        for label, prob in probabilities.items():
+
+            st.write(
+                f"{label}: {prob*100:.2f}%"
+            )
+
+        st.markdown("---")
+
+        # =========================================
+        # SECTION 7 — RECOMMENDATIONS
+        # =========================================
+
+        st.header("🚨 Recommendations")
+
+        if severity == "High":
+
+            st.error("""
+Immediate maintenance recommended.
+
+High-risk road condition detected.
+
+Possible vehicle damage and accident risk.
+""")
+
+        elif severity == "Medium":
+
+            st.warning("""
+Road repair recommended soon.
+
+Moderate infrastructure damage detected.
+""")
 
         else:
 
-            st.success("✅ Normal Road")
+            st.success("""
+Road condition appears safe.
 
-        # =========================================
-        # PROBABILITY GRAPH
-        # =========================================
-
-        if show_probabilities:
-
-            st.subheader("📊 Prediction Probabilities")
-
-            probabilities = {}
-
-            for i, prob in enumerate(prediction[0]):
-
-                probabilities[index_to_label[i]] = float(prob)
-
-            st.bar_chart(probabilities)
-
-            for label, prob in probabilities.items():
-
-                st.write(f"{label}: {prob*100:.2f}%")
+Routine monitoring recommended.
+""")
 
 # =========================================
 # FOOTER
@@ -262,4 +357,6 @@ if uploaded_file is not None:
 
 st.markdown("---")
 
-st.write("🚀 Built using TensorFlow + Streamlit")
+st.write(
+    "🚀 Built using TensorFlow, CNN, and Streamlit"
+)
