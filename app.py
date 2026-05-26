@@ -59,10 +59,14 @@ with open("label_map.json", "r") as f:
 index_to_label = {v: k for k, v in label_map.items()}
 
 # =========================================
-# SETTINGS
+# FIXED MODEL IMAGE SIZE
 # =========================================
 
-IMG_SIZE = 224
+IMG_SIZE = 128
+
+# =========================================
+# SIDEBAR SETTINGS
+# =========================================
 
 st.sidebar.title("⚙️ Prediction Settings")
 
@@ -116,7 +120,7 @@ Upload a road image to detect:
 """)
 
 # =========================================
-# FILE UPLOAD
+# FILE UPLOADER
 # =========================================
 
 uploaded_file = st.file_uploader(
@@ -130,11 +134,11 @@ uploaded_file = st.file_uploader(
 
 def preprocess_image(image):
 
-    # RESIZE
-    image = image.resize((IMG_SIZE, IMG_SIZE))
+    # MODEL EXPECTS 128x128 RGB
+    image = image.resize((128, 128))
 
-    # GRAYSCALE
-    image = image.convert("L")
+    # RGB FORMAT
+    image = image.convert("RGB")
 
     # BRIGHTNESS
     enhancer = ImageEnhance.Brightness(image)
@@ -154,16 +158,13 @@ def preprocess_image(image):
     elif flip_option == "Vertical":
         image = image.transpose(Image.FLIP_TOP_BOTTOM)
 
-    # TO ARRAY
+    # CONVERT TO ARRAY
     img_array = np.array(image)
 
     # NORMALIZE
     img_array = img_array.astype("float32") / 255.0
 
-    # CHANNEL DIMENSION
-    img_array = np.expand_dims(img_array, axis=-1)
-
-    # BATCH DIMENSION
+    # ADD BATCH DIMENSION
     img_array = np.expand_dims(img_array, axis=0)
 
     return image, img_array
@@ -178,19 +179,23 @@ if uploaded_file is not None:
 
     col1, col2 = st.columns(2)
 
+    # ORIGINAL IMAGE
     with col1:
         st.subheader("📷 Original Image")
         st.image(np.array(image), width=350)
 
+    # PROCESS IMAGE
     processed_display_image, processed_image = preprocess_image(image)
 
+    # PROCESSED IMAGE
     with col2:
         st.subheader("⚡ Processed Image")
         st.image(np.array(processed_display_image), width=350)
 
-    # DEBUG SHAPE
+    # SHOW INPUT SHAPE
     st.write("Prediction Input Shape:", processed_image.shape)
 
+    # PREDICT BUTTON
     if st.button("🔍 Predict Road Condition"):
 
         with st.spinner("Analyzing Road Image..."):
