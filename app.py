@@ -26,7 +26,7 @@ if not os.path.exists(MODEL_PATH):
 
     file_id = "1bVyGak95iSWEpOxJxBL7hksgozoGaSSx"
 
-    url = f"https://drive.google.com/uc?id={file_id}"
+    url = f"https://drive.google.com/uc?export=download&id={file_id}"
 
     with st.spinner("Downloading CNN Model..."):
         gdown.download(url, MODEL_PATH, quiet=False)
@@ -169,13 +169,13 @@ if uploaded_file is not None:
 
     with col1:
         st.subheader("📷 Original Image")
-        st.image(image, use_container_width=True)
+        st.image(image, width=350)
 
     processed_display_image, processed_image = preprocess_image(image)
 
     with col2:
         st.subheader("⚡ Processed Image")
-        st.image(processed_display_image, use_container_width=True)
+        st.image(processed_display_image, width=350)
 
     if st.button("🔍 Predict Road Condition"):
 
