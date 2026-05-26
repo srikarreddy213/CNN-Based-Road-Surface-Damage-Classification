@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 # =========================================
-# DOWNLOAD MODEL FROM GOOGLE DRIVE
+# DOWNLOAD MODEL
 # =========================================
 
 MODEL_PATH = "road_damage_model.keras"
@@ -43,6 +43,13 @@ def load_model():
 model = load_model()
 
 # =========================================
+# SHOW MODEL INPUT SHAPE
+# =========================================
+
+st.sidebar.write("Model Input Shape:")
+st.sidebar.write(model.input_shape)
+
+# =========================================
 # LOAD LABEL MAP
 # =========================================
 
@@ -52,14 +59,10 @@ with open("label_map.json", "r") as f:
 index_to_label = {v: k for k, v in label_map.items()}
 
 # =========================================
-# FIXED IMAGE SIZE
+# SETTINGS
 # =========================================
 
 IMG_SIZE = 224
-
-# =========================================
-# SIDEBAR SETTINGS
-# =========================================
 
 st.sidebar.title("⚙️ Prediction Settings")
 
@@ -92,7 +95,7 @@ flip_option = st.sidebar.selectbox(
 )
 
 show_probabilities = st.sidebar.checkbox(
-    "Show Class Probabilities",
+    "Show Probabilities",
     value=True
 )
 
@@ -110,8 +113,6 @@ Upload a road image to detect:
 - Pothole
 - Patch
 - Normal Road
-
-using Deep Learning and CNN.
 """)
 
 # =========================================
@@ -124,7 +125,7 @@ uploaded_file = st.file_uploader(
 )
 
 # =========================================
-# IMAGE PREPROCESSING
+# PREPROCESS IMAGE
 # =========================================
 
 def preprocess_image(image):
@@ -132,8 +133,8 @@ def preprocess_image(image):
     # RESIZE
     image = image.resize((IMG_SIZE, IMG_SIZE))
 
-    # RGB FORMAT
-    image = image.convert("RGB")
+    # GRAYSCALE
+    image = image.convert("L")
 
     # BRIGHTNESS
     enhancer = ImageEnhance.Brightness(image)
@@ -153,19 +154,22 @@ def preprocess_image(image):
     elif flip_option == "Vertical":
         image = image.transpose(Image.FLIP_TOP_BOTTOM)
 
-    # CONVERT TO ARRAY
+    # TO ARRAY
     img_array = np.array(image)
 
     # NORMALIZE
     img_array = img_array.astype("float32") / 255.0
 
-    # ADD BATCH DIMENSION
+    # CHANNEL DIMENSION
+    img_array = np.expand_dims(img_array, axis=-1)
+
+    # BATCH DIMENSION
     img_array = np.expand_dims(img_array, axis=0)
 
     return image, img_array
 
 # =========================================
-# MAIN PREDICTION
+# PREDICTION
 # =========================================
 
 if uploaded_file is not None:
@@ -174,15 +178,12 @@ if uploaded_file is not None:
 
     col1, col2 = st.columns(2)
 
-    # ORIGINAL IMAGE
     with col1:
         st.subheader("📷 Original Image")
         st.image(np.array(image), width=350)
 
-    # PROCESS IMAGE
     processed_display_image, processed_image = preprocess_image(image)
 
-    # PROCESSED IMAGE
     with col2:
         st.subheader("⚡ Processed Image")
         st.image(np.array(processed_display_image), width=350)
@@ -190,7 +191,6 @@ if uploaded_file is not None:
     # DEBUG SHAPE
     st.write("Prediction Input Shape:", processed_image.shape)
 
-    # PREDICT BUTTON
     if st.button("🔍 Predict Road Condition"):
 
         with st.spinner("Analyzing Road Image..."):
@@ -221,18 +221,18 @@ if uploaded_file is not None:
 
         elif predicted_label.lower() == "crack":
 
-            st.warning("⚠️ Crack Detected on Road Surface")
+            st.warning("⚠️ Crack Detected")
 
         elif predicted_label.lower() == "patch":
 
-            st.warning("⚠️ Road Patch Detected")
+            st.warning("⚠️ Patch Detected")
 
         else:
 
-            st.success("✅ Road Appears Normal")
+            st.success("✅ Normal Road")
 
         # =========================================
-        # PROBABILITY CHART
+        # PROBABILITY GRAPH
         # =========================================
 
         if show_probabilities:
