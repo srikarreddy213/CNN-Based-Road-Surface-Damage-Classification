@@ -52,16 +52,16 @@ with open("label_map.json", "r") as f:
 index_to_label = {v: k for k, v in label_map.items()}
 
 # =========================================
+# FIXED IMAGE SIZE
+# =========================================
+
+IMG_SIZE = 224
+
+# =========================================
 # SIDEBAR SETTINGS
 # =========================================
 
 st.sidebar.title("⚙️ Prediction Settings")
-
-img_size = st.sidebar.selectbox(
-    "Image Size",
-    [128, 224, 256],
-    index=1
-)
 
 brightness = st.sidebar.slider(
     "Brightness",
@@ -129,30 +129,37 @@ uploaded_file = st.file_uploader(
 
 def preprocess_image(image):
 
-    image = image.resize((img_size, img_size))
+    # RESIZE
+    image = image.resize((IMG_SIZE, IMG_SIZE))
 
-    # Brightness
+    # RGB FORMAT
+    image = image.convert("RGB")
+
+    # BRIGHTNESS
     enhancer = ImageEnhance.Brightness(image)
     image = enhancer.enhance(brightness)
 
-    # Contrast
+    # CONTRAST
     enhancer = ImageEnhance.Contrast(image)
     image = enhancer.enhance(contrast)
 
-    # Rotation
+    # ROTATION
     image = image.rotate(rotation)
 
-    # Flip
+    # FLIP
     if flip_option == "Horizontal":
         image = image.transpose(Image.FLIP_LEFT_RIGHT)
 
     elif flip_option == "Vertical":
         image = image.transpose(Image.FLIP_TOP_BOTTOM)
 
+    # CONVERT TO ARRAY
     img_array = np.array(image)
 
-    img_array = img_array / 255.0
+    # NORMALIZE
+    img_array = img_array.astype("float32") / 255.0
 
+    # ADD BATCH DIMENSION
     img_array = np.expand_dims(img_array, axis=0)
 
     return image, img_array
@@ -163,20 +170,27 @@ def preprocess_image(image):
 
 if uploaded_file is not None:
 
-    image = Image.open(uploaded_file).convert("RGB")
+    image = Image.open(uploaded_file)
 
     col1, col2 = st.columns(2)
 
+    # ORIGINAL IMAGE
     with col1:
         st.subheader("📷 Original Image")
-        st.image(image, width=350)
+        st.image(np.array(image), width=350)
 
+    # PROCESS IMAGE
     processed_display_image, processed_image = preprocess_image(image)
 
+    # PROCESSED IMAGE
     with col2:
         st.subheader("⚡ Processed Image")
-        st.image(processed_display_image, width=350)
+        st.image(np.array(processed_display_image), width=350)
 
+    # DEBUG SHAPE
+    st.write("Prediction Input Shape:", processed_image.shape)
+
+    # PREDICT BUTTON
     if st.button("🔍 Predict Road Condition"):
 
         with st.spinner("Analyzing Road Image..."):
@@ -218,7 +232,7 @@ if uploaded_file is not None:
             st.success("✅ Road Appears Normal")
 
         # =========================================
-        # PROBABILITIES
+        # PROBABILITY CHART
         # =========================================
 
         if show_probabilities:
